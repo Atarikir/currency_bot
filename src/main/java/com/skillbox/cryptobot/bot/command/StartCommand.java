@@ -1,5 +1,8 @@
 package com.skillbox.cryptobot.bot.command;
 
+import com.skillbox.cryptobot.data.model.Subscriber;
+import com.skillbox.cryptobot.service.SubscriberService;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -9,39 +12,49 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.bots.AbsSender;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-
-/**
- * Обработка команды начала работы с ботом
- */
+/** Обработка команды начала работы с ботом */
 @Service
 @AllArgsConstructor
 @Slf4j
 public class StartCommand implements IBotCommand {
 
-    @Override
-    public String getCommandIdentifier() {
-        return "start";
-    }
+  private final SubscriberService subscriberService;
 
-    @Override
-    public String getDescription() {
-        return "Запускает бота";
-    }
+  @Override
+  public String getCommandIdentifier() {
+    return "start";
+  }
 
-    @Override
-    public void processMessage(AbsSender absSender, Message message, String[] arguments) {
-        SendMessage answer = new SendMessage();
-        answer.setChatId(message.getChatId());
+  @Override
+  public String getDescription() {
+    return "Запускает бота";
+  }
 
-        answer.setText("""
+  @Override
+  public void processMessage(AbsSender absSender, Message message, String[] arguments) {
+    SendMessage answer = new SendMessage();
+    answer.setChatId(message.getChatId());
+
+    answer.setText(
+        """
                 Привет! Данный бот помогает отслеживать стоимость биткоина.
                 Поддерживаемые команды:
+                 /subscribe [число] - подписаться на стоимость биткоина в USD
                  /get_price - получить стоимость биткоина
+                 /get_subscription - получить текущую подписку
+                 /unsubscribe - отменить подписку на стоимость
                 """);
-        try {
-            absSender.execute(answer);
-        } catch (TelegramApiException e) {
-            log.error("Error occurred in /start command", e);
-        }
+    try {
+      Long chatId = message.getFrom().getId();
+      Subscriber subscriber = subscriberService.getSubscriberByChatId(chatId);
+      if (subscriber == null) {
+        subscriber =
+            Subscriber.builder().chatId(chatId).lastMessageTime(LocalDateTime.now()).build();
+        subscriberService.save(subscriber);
+      }
+      absSender.execute(answer);
+    } catch (TelegramApiException e) {
+      log.error("Error occurred in /start command", e);
     }
+  }
 }
